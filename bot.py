@@ -6,10 +6,9 @@ from aiogram.filters import Command
 import yt_dlp
 import logging
 
-# Отключаем логи yt-dlp
 logging.getLogger('yt_dlp').setLevel(logging.ERROR)
 
-BOT_TOKEN = "8398625791:AAEuaH_8zOYGEwe_P9EV9IzjEYczELzWRCc"
+BOT_TOKEN = "ВАШ_ТОКЕН_ЗДЕСЬ"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -17,9 +16,9 @@ dp = Dispatcher()
 video_cache = {}
 
 
-def get_ydl_opts(quality=None):
-    """Возвращает оптимальные опции для yt-dlp"""
-    base_opts = {
+def get_ydl_opts():
+    """Оптимальные опции для yt-dlp"""
+    return {
         'quiet': False,
         'no_warnings': False,
         'socket_timeout': 30,
@@ -37,8 +36,6 @@ def get_ydl_opts(quality=None):
         'skip_unavailable_fragments': True,
         'ignore_no_formats_error': False,
     }
-    
-    return base_opts
 
 
 @dp.message(Command("start"))
@@ -48,7 +45,7 @@ async def cmd_start(message: Message):
         "Отправь ссылку на видео и выбери качество:\n"
         "🎥 720p, 480p, 360p\n"
         "🎵 Только аудио\n\n"
-        "⚠️ Файлы до 2GB"
+        "⚠️ Максимум до 2GB"
     )
 
 
@@ -70,10 +67,10 @@ async def handle_youtube_link(message: Message):
             }
             
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🎥 720p", callback_data=f"dl_{video_id}_720")],
-                [InlineKeyboardButton(text="📱 480p", callback_data=f"dl_{video_id}_480")],
+                [InlineKeyboardButton(text="🎥 720p (HD)", callback_data=f"dl_{video_id}_720")],
+                [InlineKeyboardButton(text="📱 480p (SD)", callback_data=f"dl_{video_id}_480")],
                 [InlineKeyboardButton(text="📉 360p", callback_data=f"dl_{video_id}_360")],
-                [InlineKeyboardButton(text="🎵 Аудио", callback_data=f"dl_{video_id}_audio")]
+                [InlineKeyboardButton(text="🎵 Аудио MP3", callback_data=f"dl_{video_id}_audio")]
             ])
             
             duration = info.get('duration', 0)
@@ -85,16 +82,16 @@ async def handle_youtube_link(message: Message):
             
             await status_msg.edit_text(
                 f"✅ <b>{title}</b>\n\n"
-                f"⏱ {duration_min}:{duration_sec:02d}\n"
-                f"👤 {uploader}\n\n"
+                f"⏱️ Длина: {duration_min}:{duration_sec:02d}\n"
+                f"👤 Автор: {uploader}\n\n"
                 f"Выбери качество:",
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
             
     except Exception as e:
-        error_msg = str(e)[:100]
-        await status_msg.edit_text(f"❌ Ошибка: {error_msg}\n\nПроверь ссылку или попробуй позже")
+        error_msg = str(e)[:80]
+        await status_msg.edit_text(f"❌ Ошибка: {error_msg}\n\nПроверь ссылку")
 
 
 @dp.callback_query(F.data.startswith("dl_"))
@@ -103,10 +100,6 @@ async def process_download(callback: CallbackQuery):
     
     try:
         parts = callback.data.split("_")
-        if len(parts) < 3:
-            await callback.message.edit_text("❌ Ошибка данных")
-            return
-            
         video_id = parts[1]
         quality = parts[2]
         
@@ -121,19 +114,19 @@ async def process_download(callback: CallbackQuery):
         await callback.message.edit_text(f"⏬ Скачиваю {quality}...")
         
         filename = f"video_{video_id}"
-        
-        # Опции для скачивания
         ydl_opts = get_ydl_opts()
         
         if quality == "audio":
+            # Аудио в любом доступном формате
             ydl_opts.update({
-                'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
+                'format': 'bestaudio',
                 'postprocessors': [],
                 'outtmpl': filename + '.%(ext)s',
             })
         else:
+            # Видео правильного формата 16:9
             ydl_opts.update({
-                'format': f'(bv*[height<={quality}][ext=mp4]+ba[ext=m4a]/bv*[height<={quality}]+ba/b[height<={quality}])[filesize<?2G]',
+                'format': f'(bv*[height<={quality}]+ba/b[height<={quality}])[filesize<?2G]',
                 'outtmpl': filename + '.%(ext)s',
             })
         
@@ -141,7 +134,7 @@ async def process_download(callback: CallbackQuery):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
         
-        # Ищем скачанный файл
+        # Ищем файл
         downloaded_file = None
         for file in os.listdir('.'):
             if file.startswith(filename) and not file.endswith('.info.json'):
@@ -149,7 +142,7 @@ async def process_download(callback: CallbackQuery):
                 break
         
         if not downloaded_file:
-            await callback.message.edit_text("❌ Ошибка при скачивании")
+            await callback.message.edit_text("❌ Файл не найден")
             return
         
         # Проверяем размер
@@ -157,19 +150,19 @@ async def process_download(callback: CallbackQuery):
         
         if file_size == 0:
             os.remove(downloaded_file)
-            await callback.message.edit_text("❌ YouTube заблокировал скачивание.\nПопробуй другое видео")
+            await callback.message.edit_text("❌ YouTube заблокировал. Попробуй другое видео")
             return
         
         file_size_mb = file_size / (1024 * 1024)
         
         if file_size_mb > 2000:
             os.remove(downloaded_file)
-            await callback.message.edit_text(f"❌ Файл слишком большой: {file_size_mb:.0f}MB")
+            await callback.message.edit_text(f"❌ Слишком большой: {file_size_mb:.0f}MB")
             return
         
-        await callback.message.edit_text(f"📤 Отправляю файл ({file_size_mb:.1f}MB)...")
+        await callback.message.edit_text(f"📤 Отправляю ({file_size_mb:.1f}MB)...")
         
-        # Отправляем файл
+        # Отправляем
         try:
             if quality == "audio":
                 audio_file = FSInputFile(downloaded_file)
@@ -187,20 +180,22 @@ async def process_download(callback: CallbackQuery):
             
             await callback.message.delete()
         except Exception as send_error:
-            await callback.message.edit_text(f"❌ Ошибка отправки: {str(send_error)[:100]}")
+            await callback.message.edit_text(f"❌ Ошибка отправки")
         finally:
-            # Удаляем файл
+            # Очищаем
             if os.path.exists(downloaded_file):
-                os.remove(downloaded_file)
-            # Очищаем кэш
+                try:
+                    os.remove(downloaded_file)
+                except:
+                    pass
             if video_id in video_cache:
                 del video_cache[video_id]
         
     except Exception as e:
-        error_msg = str(e)[:150]
+        error_msg = str(e)[:100]
         await callback.message.edit_text(f"❌ Ошибка: {error_msg}")
         
-        # Очищаем оставшиеся файлы
+        # Удаляем оставшиеся файлы
         try:
             video_id = callback.data.split("_")[1]
             filename = f"video_{video_id}"
@@ -215,16 +210,16 @@ async def process_download(callback: CallbackQuery):
 
 
 async def main():
-    print("=" * 50)
+    print("\n" + "=" * 60)
     print("🚀 YouTube Downloader Bot запущен!")
-    print("=" * 50)
-    print("Нажмите Ctrl+C для остановки")
-    print("=" * 50)
+    print("=" * 60)
+    print("Бот готов к использованию. Нажмите Ctrl+C для остановки")
+    print("=" * 60 + "\n")
     
     try:
         await dp.start_polling(bot)
     except KeyboardInterrupt:
-        print("\n⏹ Бот остановлен")
+        print("\n⏹ Бот остановлен пользователем")
     finally:
         await bot.session.close()
 
