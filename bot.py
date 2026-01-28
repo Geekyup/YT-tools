@@ -8,7 +8,7 @@ import logging
 
 logging.getLogger('yt_dlp').setLevel(logging.ERROR)
 
-BOT_TOKEN = "ВАШ_ТОКЕН_ЗДЕСЬ"
+BOT_TOKEN = "8398625791:AAEuaH_8zOYGEwe_P9EV9IzjEYczELzWRCc"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
