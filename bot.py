@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import Command
 import yt_dlp
 
-BOT_TOKEN = "8544554988:AAH204_69wbqBYVds3ieBDsrYyMXUTEGlbA"
+BOT_TOKEN = "8398625791:AAEuaH_8zOYGEwe_P9EV9IzjEYczELzWRCc"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
