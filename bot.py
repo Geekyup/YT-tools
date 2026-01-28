@@ -117,24 +117,20 @@ async def process_download(callback: CallbackQuery):
         ydl_opts = get_ydl_opts()
         
         if quality == "audio":
-            # Аудио в любом доступном формате
             ydl_opts.update({
                 'format': 'bestaudio',
                 'postprocessors': [],
                 'outtmpl': filename + '.%(ext)s',
             })
         else:
-            # Видео правильного формата 16:9
             ydl_opts.update({
-                'format': f'(bv*[height<={quality}]+ba/b[height<={quality}])[filesize<?2G]',
+                'format': f'(bv*[height<={quality}]+ba/bv*[height<={quality}]/b[height<={quality}]/bv+ba/b)[filesize<?2G]',
                 'outtmpl': filename + '.%(ext)s',
             })
         
-        # Скачиваем
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
         
-        # Ищем файл
         downloaded_file = None
         for file in os.listdir('.'):
             if file.startswith(filename) and not file.endswith('.info.json'):
@@ -145,7 +141,6 @@ async def process_download(callback: CallbackQuery):
             await callback.message.edit_text("❌ Файл не найден")
             return
         
-        # Проверяем размер
         file_size = os.path.getsize(downloaded_file)
         
         if file_size == 0:
@@ -162,7 +157,6 @@ async def process_download(callback: CallbackQuery):
         
         await callback.message.edit_text(f"📤 Отправляю ({file_size_mb:.1f}MB)...")
         
-        # Отправляем
         try:
             if quality == "audio":
                 audio_file = FSInputFile(downloaded_file)
@@ -182,7 +176,6 @@ async def process_download(callback: CallbackQuery):
         except Exception as send_error:
             await callback.message.edit_text(f"❌ Ошибка отправки")
         finally:
-            # Очищаем
             if os.path.exists(downloaded_file):
                 try:
                     os.remove(downloaded_file)
@@ -195,7 +188,6 @@ async def process_download(callback: CallbackQuery):
         error_msg = str(e)[:100]
         await callback.message.edit_text(f"❌ Ошибка: {error_msg}")
         
-        # Удаляем оставшиеся файлы
         try:
             video_id = callback.data.split("_")[1]
             filename = f"video_{video_id}"
